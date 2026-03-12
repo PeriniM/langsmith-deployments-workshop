@@ -70,13 +70,6 @@ SYSTEM_PROMPT = """You are a helpful calendar assistant. You can:
 When scheduling events, always check the calendar first for conflicts.
 Be friendly and confirm when events are successfully created."""
 
-# Default context so the UI can show the default system prompt when editing.
-# When creating an assistant, pass context=DEFAULT_CONTEXT to pre-fill the form.
-DEFAULT_CONTEXT: dict = {
-    "model_name": "openai",
-    "system_prompt": SYSTEM_PROMPT,
-}
-
 tools = [read_calendar, write_calendar]
 tools_by_name = {t.name: t for t in tools}
 
@@ -119,11 +112,16 @@ class ContextSchema(BaseModel):
 
 
 def llm_call(state: dict, runtime: Runtime[ContextSchema]):
-    """LLM node: model and system prompt from context, merged with DEFAULT_CONTEXT."""
-    ctx = {**DEFAULT_CONTEXT, **(runtime.context or {})}
-    raw = ctx.get("model_name", "openai")
-    model_name: ModelName = raw if raw in ("openai", "anthropic") else "openai"
-    system_prompt = ctx.get("system_prompt") or SYSTEM_PROMPT
+    """LLM node: model and system prompt from context (ContextSchema has defaults)."""
+    raw = runtime.context
+    if raw is None:
+        ctx = ContextSchema()
+    elif isinstance(raw, ContextSchema):
+        ctx = raw
+    else:
+        ctx = ContextSchema.model_validate(raw)
+    model_name = ctx.model_name if ctx.model_name in ("openai", "anthropic") else "openai"
+    system_prompt = ctx.system_prompt or SYSTEM_PROMPT
     model = get_model(model_name)
     model_with_tools = model.bind_tools(tools)
 
