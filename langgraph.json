@@ -2,7 +2,10 @@
     "graphs": {
         "langchain_basic": "./agents/langchain_basic.py:agent",
         "langgraph_basic": "./agents/langgraph_basic.py:agent",
-        "deepagents_basic": "./agents/deepagents_basic.py:agent"
+        "deepagents_basic": "./agents/deepagents_basic.py:agent",
+        "langgraph_assistant": "./agents/langgraph_assistant.py:agent",
+        "langchain_remote_subagent": "./agents/langchain_remote_subagent.py:make_graph",
+        "langchain_remote_supervisor": "./agents/langchain_remote_supervisor.py:agent"
     },
     "env": ".env",
     "python_version": "3.11",
