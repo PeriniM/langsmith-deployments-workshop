@@ -1,6 +1,8 @@
 {
     "graphs": {
-        "langchain_basic": "./agents/langchain_basic.py:agent"
+        "langchain_basic": "./agents/langchain_basic.py:agent",
+        "langgraph_basic": "./agents/langgraph_basic.py:agent",
+        "deepagents_basic": "./agents/deepagents_basic.py:agent"
     },
     "env": ".env",
     "python_version": "3.11",
