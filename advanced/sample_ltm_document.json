@@ -1,0 +1,11 @@
+{
+  "description": "Example document value for the store. Use with namespace (user_id, 'documents') and any string key (e.g. a unique id). The 'document' (or 'documents') key is what search_memory reads.",
+  "namespace": ["<user_id>", "documents"],
+  "key": "doc-001",
+  "value": {
+    "document": "Our company policy allows remote work up to three days per week. All employees must attend the weekly standup on Mondays at 10:00 AM. Leave requests should be submitted at least two weeks in advance through the HR portal."
+  },
+  "another_example_value": {
+    "document": "The project timeline: Phase 1 (Q1) – research and design; Phase 2 (Q2) – development; Phase 3 (Q3) – testing and launch. Key contacts: engineering@company.com, product@company.com."
+  }
+}

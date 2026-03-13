@@ -42,6 +42,16 @@ uv run langgraph dev
 
 This starts the server (default port 2024) and opens [LangGraph Studio](https://docs.langchain.com/langsmith/studio), where you can run and debug the agents.
 
+### 4. Run the advanced server (auth, store, custom HTTP)
+
+To run the **advanced** setup with authentication, long-term memory store (semantic search), checkpointer TTL, custom HTTP app, and CORS:
+
+```bash
+uv run langgraph dev --config ./langgraph_advanced.json
+```
+
+This uses `langgraph_advanced.json`, which wires the **`langchain_advanced`** agent and the `advanced/` folder (auth, webapp). See [Advanced setup](#-advanced-setup) below.
+
 ## 📁 Project Structure
 
 ```
@@ -50,14 +60,20 @@ langsmith-deployments-workshop/
 │   ├── langchain_basic.py         # LangChain create_agent (calendar tools)
 │   ├── langgraph_basic.py         # LangGraph StateGraph (calendar tools)
 │   ├── langgraph_assistant.py     # Calendar + configurable model & system prompt (context)
+│   ├── langchain_advanced.py      # Calendar + LTM (memories + documents), middleware, auth context
 │   ├── langchain_remote_subagent.py   # Calendar subagent (make_graph + distributed tracing)
 │   ├── langchain_remote_supervisor.py  # Supervisor with calendar as RemoteGraph tool
 │   ├── deepagents_basic.py        # Deep Agents (planning, subagents)
 │   └── utils.py                   # Shared model config
+├── advanced/                  # Advanced config (used with langgraph_advanced.json)
+│   ├── auth.py                    # Bearer-token auth + add_owner access control
+│   ├── webapp.py                  # Custom FastAPI app (e.g. /hello), mounted under http.app
+│   └── sample_ltm_document.json  # Example document shape for store (user_id > documents)
 ├── examples/                  # How to call agents
 │   ├── client_sdk.py             # LangGraph SDK (runs/stream)
 │   └── remotegraph.py            # RemoteGraph (agent as subgraph)
-├── langgraph.json             # LangGraph CLI / deployment config
+├── langgraph.json             # Default LangGraph CLI config
+├── langgraph_advanced.json    # Advanced config: auth, store, checkpointer, http, langchain_advanced
 ├── pyproject.toml
 └── .env.example
 ```
@@ -71,11 +87,56 @@ All agents are wired in `langgraph.json` and exposed by the dev server:
 | `langchain_basic`          | `agents/langchain_basic.py`        | Calendar assistant via LangChain `create_agent` with `read_calendar` and `write_calendar`. |
 | `langgraph_basic`          | `agents/langgraph_basic.py`        | Same calendar tools and prompt, implemented as a LangGraph `StateGraph` with tool-calling loop. |
 | `langgraph_assistant`      | `agents/langgraph_assistant.py`    | Calendar assistant with **configurable context**: `model_name` (`"openai"` \| `"anthropic"`, default openai) and optional `system_prompt` override. Studio can show a dropdown for model and pre-fill the default prompt. |
+| `langchain_advanced`       | `agents/langchain_advanced.py`     | **Advanced config only**: calendar + **long-term memory** (memories + documents), pre-model middleware (inject preferences), `user_id` context. Use with `langgraph_advanced.json`. |
 | `langchain_remote_subagent`| `agents/langchain_remote_subagent.py` | Calendar agent exposed via **make_graph** with **distributed tracing**: runs inside `ls.tracing_context` when a parent trace is present (e.g. when called by the supervisor). |
 | `langchain_remote_supervisor` | `agents/langchain_remote_supervisor.py` | **Supervisor** agent with the calendar as a **tool**: uses a module-level **RemoteGraph** pointing at `langchain_remote_subagent`. Uses `distributed_tracing=True` so subagent runs appear under the same trace. |
 | `deepagents_basic`         | `agents/deepagents_basic.py`       | Deep Agents calendar assistant with planning (todos) and subagent support. |
 
 Use these graph IDs when calling the API (e.g. in `client_sdk.py` or RemoteGraph).
+
+## Advanced setup
+
+The **advanced** configuration (`langgraph_advanced.json`) adds authentication, a persistent store with semantic search, checkpointer TTL, and a custom HTTP app. Run it with:
+
+```bash
+uv run langgraph dev --config ./langgraph_advanced.json
+```
+
+### What `langgraph_advanced.json` enables
+
+| Feature | Config key | Description |
+|--------|------------|-------------|
+| **Graph** | `graphs.langchain_advanced` | Single agent: `agents/langchain_advanced.py:agent`. |
+| **Auth** | `auth.path` | `advanced/auth.py:auth` — Bearer-token auth; identity is used as `user_id` in context. |
+| **Store** | `store` | Indexed store (e.g. `openai:text-embedding-3-small`, 1536 dims) for semantic search; TTL for expiry. |
+| **Checkpointer** | `checkpointer` | TTL for thread checkpoints (e.g. delete after 43200 min). |
+| **HTTP** | `http` | Custom app `advanced/webapp.py:app`, CORS, configurable headers, `mount_prefix` (e.g. `/api/v1`). |
+
+### The `advanced/` folder
+
+| File | Role |
+|------|------|
+| **`auth.py`** | **Auth** — `Auth()` and `@auth.authenticate`; validates `Authorization: Bearer <token>` against a toy `VALID_TOKENS` map and returns `identity` (e.g. `user1`, `user2`). `@auth.on` **add_owner** restricts access by owner unless the user is a Studio user. |
+| **`webapp.py`** | **Custom HTTP app** — FastAPI app with e.g. `GET /hello`; mounted by the server under the configured prefix. |
+| **`sample_ltm_document.json`** | **Sample LTM document** — Example JSON for a document you add manually to the store: namespace `(user_id, "documents")`, value with a `"document"` (or `"documents"`) key. Used by the **search_memory** tool. |
+
+### The `langchain_advanced` agent (`agents/langchain_advanced.py`)
+
+Calendar agent with **long-term memory (LTM)** and **per-user context**:
+
+- **Context** — `Context(user_id: str)`. The server injects this (e.g. from auth `identity`); all store access is namespaced by `user_id`.
+- **Tools**
+  - **`read_calendar`** / **`write_calendar`** — Same as basic calendar (in-memory events).
+  - **`search_memory`** — **Semantic search over the `documents` namespace**: `(user_id, "documents")`. Returns matching document content or `"No documents available."` if none. Use for user-added documents (see `advanced/sample_ltm_document.json`).
+  - **`add_memory`** — Writes to the **`memories`** namespace: `(user_id, "memories")` with `{"memory": content}`. Used for preferences/facts the user wants the agent to remember.
+- **Pre-model middleware** — **`inject_memory_preferences`** (async): before each model call, runs **`store.asearch`** on `(user_id, "memories")` and injects a **human message** like “Current user preferences: …” so the model sees stored preferences without a separate tool call.
+- **Store layout** — Two namespaces per user:
+  - **`(user_id, "memories")`** — Filled by `add_memory` and by the middleware; holds preferences/facts.
+  - **`(user_id, "documents")`** — Filled manually (or by your own API); searched by **`search_memory`**.
+
+**Calling the advanced API:** Send `Authorization: Bearer user1-token` (or `user2-token`) so the server sets context with that user’s `identity` as `user_id`. Use the graph ID **`langchain_advanced`** in requests.
+
+**Adding documents:** Add items to the store with namespace `(user_id, "documents")`, key any string (e.g. `doc-001`), and value `{"document": "Your text content here."}`. See `advanced/sample_ltm_document.json` for the exact shape.
 
 ## 🚀 Deployment Options
 

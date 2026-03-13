@@ -22,5 +22,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "deepagents>=0.4.0",
     "deepagents-cli>=0.0.3",
+    "fastapi>=0.135.1",
 ]
 

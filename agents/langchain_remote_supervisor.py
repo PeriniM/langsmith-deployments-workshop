@@ -13,10 +13,6 @@ from agents.utils import model
 
 load_dotenv(override=True)
 
-# Name of the calendar graph in this deployment (must match langgraph.json).
-# Use the graph that has make_graph with tracing context (langchain_remote_subagent).
-CALENDAR_GRAPH_ID = "langchain_remote_subagent"
-
 # General agent system prompt: can delegate to calendar for read/schedule.
 GENERAL_SYSTEM_PROMPT = """You are a helpful general assistant. You can answer questions and help with tasks.
 For reading or scheduling calendar events, use the calendar tool to delegate to the calendar assistant.
@@ -27,6 +23,10 @@ Use the calendar tool when the user asks about events, schedule, availability, o
 # worker. Run with multiple workers if the run gets stuck in the tools step (e.g. langgraph dev --n-jobs-per-worker 2 or use a separate deployment URL for the subagent).
 _client = get_client()
 _sync_client = get_sync_client()
+
+# Name of the calendar graph in this deployment (must match langgraph.json).
+# Use the graph that has make_graph with tracing context (langchain_remote_subagent).
+CALENDAR_GRAPH_ID = "langchain_remote_subagent"
 
 # Remote calendar graph
 remote_calendar = RemoteGraph(

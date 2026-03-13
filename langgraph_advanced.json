@@ -1,0 +1,51 @@
+{
+    "graphs": {
+        "langchain_advanced": "./agents/langchain_advanced.py:agent"
+    },
+    "checkpointer": {
+        "ttl": {
+          "strategy": "delete",
+          "sweep_interval_minutes": 60,
+          "default_ttl": 43200
+        }
+    },
+    "store": {
+        "index": {
+            "embed": "openai:text-embedding-3-small",
+            "dims": 1536,
+            "fields": ["$"]
+        },
+        "ttl": {
+            "refresh_on_read": true,
+            "sweep_interval_minutes": 120,
+            "default_ttl": 10080
+        }
+    },
+    "auth": {
+        "path": "./advanced/auth.py:auth",
+        "disable_studio_auth": false
+    },
+    "http": {
+        "app": "./advanced/webapp.py:app",
+        "configurable_headers": {
+          "includes": ["x-user-id", "x-organization-id", "my-prefix-*"],
+          "excludes": ["authorization", "x-api-key"]
+        },
+        "logging_headers": {
+            "includes": ["request-id", "x-purchase-id", "*-trace-*"],
+            "excludes": ["authorization", "x-api-key", "x-organization-id", "x-user-id"]
+          },
+        "cors": {
+            "allow_origins": ["*"],
+            "allow_credentials": true,
+            "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+            "allow_headers": ["*"],
+            "expose_headers": ["*"]
+        },
+        "mount_prefix": "/api/v1"
+    },
+    "env": ".env",
+    "python_version": "3.11",
+    "dependencies": ["."],
+    "image_distro": "wolfi"
+}
