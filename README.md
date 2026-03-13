@@ -67,7 +67,7 @@ langsmith-deployments-workshop/
 │   └── utils.py                   # Shared model config
 ├── advanced/                  # Advanced config (used with langgraph_advanced.json)
 │   ├── auth.py                    # Bearer-token auth + add_owner access control
-│   ├── webapp.py                  # Custom FastAPI app (e.g. /hello), mounted under http.app
+│   ├── webapp.py                  # Custom async routes: GET /hello, POST /invoke (mounted at /api/v1)
 │   └── sample_ltm_document.json  # Example document shape for store (user_id > documents)
 ├── examples/                  # How to call agents
 │   ├── client_sdk.py             # LangGraph SDK (runs/stream)
@@ -117,8 +117,32 @@ uv run langgraph dev --config ./langgraph_advanced.json
 | File | Role |
 |------|------|
 | **`auth.py`** | **Auth** — `Auth()` and `@auth.authenticate`; validates `Authorization: Bearer <token>` against a toy `VALID_TOKENS` map and returns `identity` (e.g. `user1`, `user2`). `@auth.on` **add_owner** restricts access by owner unless the user is a Studio user. |
-| **`webapp.py`** | **Custom HTTP app** — FastAPI app with e.g. `GET /hello`; mounted by the server under the configured prefix. |
+| **`webapp.py`** | **Custom HTTP app** — Async FastAPI routes mounted under `mount_prefix`; see [Custom routes](#custom-routes-webapp) below. |
 | **`sample_ltm_document.json`** | **Sample LTM document** — Example JSON for a document you add manually to the store: namespace `(user_id, "documents")`, value with a `"document"` (or `"documents"`) key. Used by the **search_memory** tool. |
+
+### Custom routes (webapp)
+
+With `mount_prefix: "/api/v1"`, the custom app in `advanced/webapp.py` exposes these routes (all async, using the LangGraph SDK `get_client()` for in-process graph calls):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| **GET** | `/api/v1/hello` | Health-style endpoint; returns `{"Hello": "World"}`. |
+| **POST** | `/api/v1/invoke` | Invokes the **`langchain_advanced`** graph with one user message and returns the assistant’s last message content. |
+
+**POST /api/v1/invoke**
+
+- **Body:** `{"message": "<user message>", "user_id": "<optional>"}`. If `user_id` is omitted, the handler uses the `x-user-id` header or `"default"`.
+- **Headers:** Send `Authorization: Bearer <token>` (required when auth is enabled) and optionally `x-user-id` for context.
+- **Response:** `{"content": "<assistant reply>", "graph_id": "langchain_advanced"}`. On graph failure returns **502** with a detail message.
+
+**Example:** Run the advanced server, then call the custom invoke route:
+
+```bash
+uv run langgraph dev --config ./langgraph_advanced.json   # terminal 1
+uv run python examples/invoke_advanced_agent.py           # terminal 2
+```
+
+`examples/invoke_advanced_agent.py` sends a POST to `http://localhost:2024/api/v1/invoke` with `Authorization: Bearer user1-token` and `x-user-id: user1`.
 
 ### The `langchain_advanced` agent (`agents/langchain_advanced.py`)
 
@@ -317,6 +341,7 @@ graph TD
 
 - **`examples/client_sdk.py`** — Calls an agent (e.g. `langchain_basic`) via the LangGraph SDK with a threadless run and streaming. Point `url` at your deployment to test a deployed agent.
 - **`examples/remotegraph.py`** — Composes a parent graph that calls a child graph via `RemoteGraph`; change `url` and `graph_name` to use a deployed graph.
+- **`examples/invoke_advanced_agent.py`** — Calls the **advanced** server’s custom route `POST /api/v1/invoke` with auth and `x-user-id`; use with `langgraph dev --config ./langgraph_advanced.json` (see [Custom routes](#custom-routes-webapp)).
 - **Supervisor + subagent** — Run the `langchain_remote_supervisor` graph in Studio (or via SDK). It delegates calendar tasks to `langchain_remote_subagent` via a tool. Use `langgraph dev --n-jobs-per-worker 2` so the in-process subagent call does not deadlock (see [Local Development & Testing](#local-development--testing)).
 
 Run against the local dev server:
