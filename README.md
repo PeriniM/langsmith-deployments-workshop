@@ -1,5 +1,7 @@
 # LangSmith Deployments Workshop 🚀
 
+![LangSmith Deployments Workshop](assets/hero.png)
+
 A hands-on workshop for deploying agents to [LangSmith Deployment](https://docs.langchain.com/langsmith/deployments). This repo includes several agent examples built with [LangChain](https://docs.langchain.com/) and [LangGraph](https://docs.langchain.com/oss/python/langgraph/overview), plus examples for calling deployed agents via the [LangGraph SDK](https://docs.langchain.com/langgraph-platform/sdk) and [RemoteGraph](https://docs.langchain.com/langsmith/use-remote-graph).
 
 ## 🛠️ Prerequisites
